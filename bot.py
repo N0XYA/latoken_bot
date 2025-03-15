@@ -196,7 +196,8 @@ async def handle_message(update: Update, context: CallbackContext) -> None:
     await update.message.reply_text(response)
 
 
-async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def help_command(update: Update,
+                       context: ContextTypes.DEFAULT_TYPE) -> None:
     """Send a help message when the command /help is issued"""
     user_id = update.effective_user.id
 

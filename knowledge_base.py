@@ -6,7 +6,9 @@ import numpy as np
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_openai import OpenAIEmbeddings
 from langchain.docstore.document import Document
-from config import OPENAI_API_KEY, VECTOR_DB_DIR, RELEVANT_TOPICS
+from config import (
+    OPENAI_API_KEY, VECTOR_DB_DIR, RELEVANT_TOPICS
+)
 from scraper import fetch_all_sources
 
 # Configure logging
@@ -28,10 +30,13 @@ class KnowledgeBase:
 
     def load_or_create_index(self):
         """Load an existing index or create a new one"""
-        if os.path.exists(self.index_path) and os.path.exists(self.document_path):
+        if (os.path.exists(self.index_path) and 
+                os.path.exists(self.document_path)):
             logger.info("Loading existing index and documents")
             self.index = faiss.read_index(self.index_path)
-            self.documents = np.load(self.document_path, allow_pickle=True).tolist()
+            self.documents = np.load(
+                self.document_path, allow_pickle=True
+            ).tolist()
             return True
         else:
             logger.info("No existing index found. Creating new index.")
@@ -79,7 +84,10 @@ class KnowledgeBase:
             texts = [doc.page_content for doc in batch]
             batch_embeddings = self.embeddings.embed_documents(texts)
             embeddings_list.extend(batch_embeddings)
-            logger.info(f"Processed batch {i//batch_size + 1}/{(len(all_documents)-1)//batch_size + 1}")
+            logger.info(
+                f"Processed batch {i//batch_size + 1}/"
+                f"{(len(all_documents)-1)//batch_size + 1}"
+            )
 
         # Create FAISS index
         vector_dimension = len(embeddings_list[0])
@@ -93,7 +101,9 @@ class KnowledgeBase:
 
         logger.info(f"Index created with {self.index.ntotal} vectors")
 
-    def query(self, question: str, top_k: int = 5) -> Tuple[List[str], List[Dict]]:
+    def query(
+        self, question: str, top_k: int = 5
+    ) -> Tuple[List[str], List[Dict]]:
         """
         Query the knowledge base for relevant documents
 
@@ -106,12 +116,17 @@ class KnowledgeBase:
         """
         # Check if question is relevant
         if not self.is_question_relevant(question):
-            return (["I can only answer questions about LATOKEN, its culture, or the hackathon."], 
-                    [{"source": "filter", "chunk_id": 0}])
+            return (
+                ["I can only answer questions about LATOKEN, its culture, "
+                 "or the hackathon."], 
+                [{"source": "filter", "chunk_id": 0}]
+            )
 
         # Embed the question
         question_embedding = self.embeddings.embed_query(question)
-        question_embedding_array = np.array([question_embedding]).astype('float32')
+        question_embedding_array = np.array(
+            [question_embedding]
+        ).astype('float32')
 
         # Search the index
         scores, indices = self.index.search(question_embedding_array, top_k)
@@ -121,7 +136,7 @@ class KnowledgeBase:
         retrieved_metadata = []
 
         for idx in indices[0]:
-            if idx != -1:  # FAISS may return -1 if there are not enough results
+            if idx != -1:  # FAISS may return -1 if not enough results
                 doc = self.documents[idx]
                 retrieved_docs.append(doc.page_content)
                 retrieved_metadata.append(doc.metadata)
@@ -146,7 +161,7 @@ if __name__ == "__main__":
         "What is the Sugar Cookie test for?",
         "Why is a Wartime CEO needed?",
         "When is stress useful and when is it harmful?",
-        "What is the weather in New York today?"  # Irrelevant question
+        "What is the weather in New York today?",
     ]
 
     for question in test_questions:

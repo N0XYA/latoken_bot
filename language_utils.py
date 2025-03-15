@@ -43,7 +43,7 @@ def detect_language(text):
         return lang_code
     except Exception as e:
         logger.error(f"Error detecting language: {e}")
-        return 'en'  # Default to English on error
+        return 'ru'  # Default to English on error
 
 
 def translate_response(response, target_language):
