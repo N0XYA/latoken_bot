@@ -33,9 +33,10 @@ class UserState:
     """Class to store user-specific state information"""
     def __init__(self):
         self.chat_history = []  # Store conversation history
-        self.language = 'en'    # Default language is English
+        self.language = 'ru'    # Default language is Russian
         self.last_answer = ""   # Store the last answer for follow-up questions
         self.message_count = 0  # Track number of messages for follow-up logic
+        self.gpt_answers = []   # Store GPT answers for summarization
 
 
 def format_context(docs: List[str], metadata: List[Dict]) -> str:
@@ -77,13 +78,13 @@ async def generate_response(
 
         # Define follow-up questions
         follow_up_questions = [
-            "Have you checked the LATOKEN Culture Deck?",
-            "Did you review the LATOKEN company information?",
-            "Have you looked at the hackathon details provided by LATOKEN?",
-            "Did you find this information helpful?",
-            "Are you familiar with LATOKEN's services?",
-            "Would you like to know more about the interview process?",
-            "Do you have any other questions about LATOKEN?"
+            "Вы проверили Culture Deck от LATOKEN?",
+            "Вы просмотрели информацию о компании LATOKEN?",
+            "Вы смотрели детали хакатона от LATOKEN?",
+            "Была ли эта информация полезной для вас?",
+            "Вы знакомы с сервисами LATOKEN?",
+            "Хотите узнать больше о процессе собеседования?",
+            "У вас есть другие вопросы о LATOKEN?"
         ]
 
         # Create messages array
@@ -103,24 +104,69 @@ async def generate_response(
         response = llm.invoke(messages)
         answer = response.content
 
+        # Store the answer for summarization
+        user_state.gpt_answers.append(answer)
+
         # Increment message count in user state
         user_state.message_count += 1
-        
-        # Decide whether to add a follow-up question (every 3 messages)
-        if user_state.message_count % 3 == 0:
+
+        # Check if we should generate a summary (every 3rd answer)
+        if len(user_state.gpt_answers) >= 3 and len(user_state.gpt_answers) % 3 == 0:
+            # Generate a summary and understanding check questions using GPT
+            prompt = (
+                "Based on the following 3 recent answers from a bot about LATOKEN, "
+                "I need you to: \n"
+                "1. Briefly summarize the main topics and concepts discussed\n"
+                "2. Create 2-3 specific questions that would test if the user actually "
+                "understood the key concepts from these answers (not just yes/no questions)\n\n"
+                "Format your response like this:\n"
+                "SUMMARY: [brief summary of the key topics]\n\n"
+                "UNDERSTANDING CHECK:\n"
+                "1. [first specific question about a concept covered in the answers]\n"
+                "2. [second specific question about another concept covered]\n"
+                "3. [optional third question if there were multiple important topics]\n\n"
+                "Please provide the UNDERSTANDING CHECK section in Russian. "
+                "Here are the recent answers:\n\n"
+            )
+
+            # Include the last 3 answers in the prompt
+            for i, ans in enumerate(user_state.gpt_answers[-3:]):
+                prompt += f"Answer {i+1}: {ans}\n\n"
+
+            understanding_messages = [
+                {"role": "system", "content": "You are an educational assessment specialist who evaluates comprehension. Always respond in Russian language."},
+                {"role": "user", "content": prompt}
+            ]
+
+            check_response = llm.invoke(understanding_messages)
+            understanding_check = check_response.content
+
+            # Extract only the UNDERSTANDING CHECK part
+            if "UNDERSTANDING CHECK" in understanding_check:
+                parts = understanding_check.split("UNDERSTANDING CHECK")
+                understanding_check = "ПРОВЕРКА ПОНИМАНИЯ" + parts[1]
+
+            # Always translate to the user's language first
+            if language != 'ru':
+                understanding_check = translate_response(understanding_check, language)
+
+            complete_answer = f"{answer}\n\n{understanding_check}"
+
+        # Otherwise decide whether to add a standard follow-up question (every 3rd message)
+        elif user_state.message_count % 3 == 0:
             # Simply choose a random follow-up question
             follow_up = random.choice(follow_up_questions)
-            
+
             # Translate follow-up question if needed
-            if language != 'en':
+            if language != 'ru':
                 follow_up = translate_response(follow_up, language)
-                
+
             complete_answer = f"{answer}\n\n{follow_up}"
         else:
             complete_answer = answer
 
         # Translate response if needed
-        if language != 'en' and complete_answer == answer:
+        if language != 'ru' and complete_answer == answer:
             # Only translate if not already translated with follow-up
             complete_answer = translate_response(complete_answer, language)
 
@@ -134,7 +180,7 @@ async def generate_response(
 
         # Return error message in the appropriate language
         error_msg = "I'm sorry, I encountered an error while processing your request. Please try again later."
-        if language != 'en':
+        if language != 'ru':
             error_msg = translate_response(error_msg, language)
 
         return error_msg
@@ -162,7 +208,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if len(message_text) > 7:  # If there's text after /start
         detected_lang = detect_language(message_text[7:].strip())
         user_states[user_id].language = detected_lang
-        if detected_lang != 'en':
+        if detected_lang != 'ru':
             welcome_message = translate_response(welcome_message, detected_lang)
 
     await update.message.reply_text(welcome_message)
@@ -220,8 +266,8 @@ async def help_command(update: Update,
     """Send a help message when the command /help is issued"""
     user_id = update.effective_user.id
 
-    # Get user language or use English as default
-    user_lang = 'en'
+    # Get user language or use Russian as default
+    user_lang = 'ru'
     if user_id in user_states:
         user_lang = user_states[user_id].language
 
@@ -237,11 +283,14 @@ async def help_command(update: Update,
         "- LATOKEN Culture Deck\n"
         "- Hackathon details\n"
         "- Interview and hiring process\n\n"
+        "Every third answer, I'll check your understanding with specific "
+        "questions about the topics we've discussed to help you learn key "
+        "concepts about LATOKEN.\n\n"
         "I'll automatically respond in the language you use for your question."
     )
 
     # Translate if needed
-    if user_lang != 'en':
+    if user_lang != 'ru':
         help_text = translate_response(help_text, user_lang)
 
     await update.message.reply_text(help_text)
@@ -251,19 +300,22 @@ async def reset_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     """Reset the conversation history for a user"""
     user_id = update.effective_user.id
 
-    # Get user language before resetting
-    user_lang = 'en'
+    # Get user language and answers before resetting
+    user_lang = 'ru'
+    gpt_answers = []
     if user_id in user_states:
         user_lang = user_states[user_id].language
+        gpt_answers = user_states[user_id].gpt_answers
 
     # Reset user state
     user_states[user_id] = UserState()
     user_states[user_id].language = user_lang  # Retain language preference
+    user_states[user_id].gpt_answers = gpt_answers  # Retain GPT answers history
 
     reset_message = "Conversation history has been reset. You can start a new conversation now."
 
     # Translate if needed
-    if user_lang != 'en':
+    if user_lang != 'ru':
         reset_message = translate_response(reset_message, user_lang)
 
     await update.message.reply_text(reset_message)
