@@ -19,7 +19,9 @@ SOURCES = [
     "https://coda.io/@latoken/latoken-talent/hr-referral-program-148",  
     "https://coda.io/@latoken/latoken-talent/culture-139",
     "https://coda.io/@latoken/latoken-talent/latoken-161",
-    "https://deliver.latoken.com/hackathon"
+    "https://deliver.latoken.com/hackathon",
+    "https://latoken.me/copy-of-159",
+    "https://latoken.me/listings-212"
 ]
 
 # Directory containing markdown resources
