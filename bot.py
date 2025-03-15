@@ -35,6 +35,7 @@ class UserState:
         self.chat_history = []  # Store conversation history
         self.language = 'en'    # Default language is English
         self.last_answer = ""   # Store the last answer for follow-up questions
+        self.message_count = 0  # Track number of messages for follow-up logic
 
 
 def format_context(docs: List[str], metadata: List[Dict]) -> str:
@@ -69,16 +70,20 @@ async def generate_response(
         # Define system message with context
         system_message = SYSTEM_PROMPT
         if context:
-            system_message += f"\n\nBelow is the retrieved information about LATOKEN:\n{context}"
+            system_prefix = "\n\nBelow is the retrieved information about LATOKEN:\n"
+            system_message += system_prefix + context
 
         history = user_state.chat_history[-3:] if user_state.chat_history else []
 
-        # Test follow-up questions
-        test_questions = [
+        # Define follow-up questions
+        follow_up_questions = [
             "Have you checked the LATOKEN Culture Deck?",
             "Did you review the LATOKEN company information?",
             "Have you looked at the hackathon details provided by LATOKEN?",
-            "Did you find this information helpful? Remember to check the official materials."
+            "Did you find this information helpful?",
+            "Are you familiar with LATOKEN's services?",
+            "Would you like to know more about the interview process?",
+            "Do you have any other questions about LATOKEN?"
         ]
 
         # Create messages array
@@ -88,7 +93,8 @@ async def generate_response(
         for entry in history:
             messages.append({"role": "user", "content": entry["user"]})
             if "assistant" in entry:
-                messages.append({"role": "assistant", "content": entry["assistant"]})
+                asst_msg = {"role": "assistant", "content": entry["assistant"]}
+                messages.append(asst_msg)
 
         # Add the current question
         messages.append({"role": "user", "content": question})
@@ -97,12 +103,25 @@ async def generate_response(
         response = llm.invoke(messages)
         answer = response.content
 
-        # Add a follow-up question about reading the materials
-        follow_up = random.choice(test_questions)
-        complete_answer = f"{answer}\n\n{follow_up}"
+        # Increment message count in user state
+        user_state.message_count += 1
+        
+        # Decide whether to add a follow-up question (every 3 messages)
+        if user_state.message_count % 3 == 0:
+            # Simply choose a random follow-up question
+            follow_up = random.choice(follow_up_questions)
+            
+            # Translate follow-up question if needed
+            if language != 'en':
+                follow_up = translate_response(follow_up, language)
+                
+            complete_answer = f"{answer}\n\n{follow_up}"
+        else:
+            complete_answer = answer
 
-        # Translate if needed
-        if language != 'en':
+        # Translate response if needed
+        if language != 'en' and complete_answer == answer:
+            # Only translate if not already translated with follow-up
             complete_answer = translate_response(complete_answer, language)
 
         # Update user state

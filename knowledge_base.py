@@ -10,6 +10,7 @@ from config import (
     OPENAI_API_KEY, VECTOR_DB_DIR, RELEVANT_TOPICS
 )
 from scraper import fetch_all_sources
+from generate_markdowns import process_all_sources
 
 # Configure logging
 logging.basicConfig(
@@ -148,6 +149,13 @@ def initialize_knowledge_base():
     """Initialize and return the knowledge base"""
     kb = KnowledgeBase()
     if not kb.load_or_create_index():
+        # First generate markdown files from URLs
+        logger.info(
+            "Generating markdown files from URLs before creating index"
+        )
+        process_all_sources()
+        # Then create the index which will use the newly generated 
+        # markdown files
         kb.create_index()
     return kb
 
