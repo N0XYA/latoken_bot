@@ -15,13 +15,6 @@ LANGUAGE_MAP = {
     'en': 'English',
     'ru': 'Russian',
     'fr': 'French',
-    'de': 'German',
-    'es': 'Spanish',
-    'it': 'Italian',
-    'zh': 'Chinese',
-    'ja': 'Japanese',
-    'ko': 'Korean',
-    'ar': 'Arabic'
 }
 
 
