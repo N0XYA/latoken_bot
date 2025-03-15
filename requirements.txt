@@ -1,0 +1,11 @@
+python-telegram-bot
+python-dotenv
+openai
+langchain
+langchain-openai
+langchain-text-splitters
+langchain-community
+faiss-cpu
+requests
+beautifulsoup4
+langdetect
